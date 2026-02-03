@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+.env
+
+# Database
+*.db
+server/database/dpms.db
+
+server/database/*.db-journal
+server/database/*.db-wal
+
+# Storage
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Build and IDE
+dist/
+.vscode/
+.DS_Store
+.antigravity/
+brain/
+.git.bak
