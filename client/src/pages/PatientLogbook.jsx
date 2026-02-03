@@ -16,6 +16,7 @@ import { AuthContext } from '../context/AuthContext';
 import api from '../services/api';
 import { DashboardLayout } from '../components/layout';
 import { Card, Badge } from '../components/ui';
+import toast from 'react-hot-toast';
 
 const PatientLogbook = () => {
   const { user } = useContext(AuthContext);
@@ -74,11 +75,12 @@ const PatientLogbook = () => {
       });
       setShowNoteModal(false);
       setNoteText('');
+      setNoteText('');
       // Optional: show success alert
-      alert('Note sent to doctor successfully');
+      toast.success('Note sent to doctor successfully');
     } catch (err) {
       console.error(err);
-      alert('Failed to send note');
+      toast.error('Failed to send note');
     }
   };
 

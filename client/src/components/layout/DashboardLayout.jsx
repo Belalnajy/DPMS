@@ -7,12 +7,14 @@ import Sidebar from './Sidebar';
 import { useState } from 'react';
 import { Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
 const DashboardLayout = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      <Toaster position="top-center" reverseOrder={false} />
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div
