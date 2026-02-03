@@ -9,8 +9,16 @@ const getDashboardData = (req, res) => {
     "SELECT id, role, name, national_id, phone, gender, profile_picture, diabetes_type, settings FROM users WHERE id = $1 AND role = 'patient'",
     [patientId],
     (err, result) => {
-      if (err || !result.rows || result.rows.length === 0)
+      if (err) {
+        console.error('Database Error in getDashboardData:', err);
+        return res
+          .status(500)
+          .json({ error: 'Database error: ' + err.message });
+      }
+
+      if (!result.rows || result.rows.length === 0) {
         return res.status(404).json({ error: 'Patient not found' });
+      }
 
       const user = result.rows[0];
       data.user = user;

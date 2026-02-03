@@ -94,7 +94,8 @@ const initDb = async () => {
               gender TEXT,
               password TEXT NOT NULL,
               profile_picture TEXT,
-              diabetes_type TEXT
+              diabetes_type TEXT,
+              settings TEXT
           )`);
 
       await pool.query(`CREATE TABLE IF NOT EXISTS glucose_readings (
@@ -158,7 +159,8 @@ const initDb = async () => {
             gender TEXT,
             password TEXT NOT NULL,
             profile_picture TEXT,
-            diabetes_type TEXT
+            diabetes_type TEXT,
+            settings TEXT
         )`);
 
       await runAsync(`CREATE TABLE IF NOT EXISTS glucose_readings (
