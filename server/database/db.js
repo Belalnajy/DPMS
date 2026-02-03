@@ -123,6 +123,7 @@ const initDb = async () => {
                 patient_id INTEGER NOT NULL REFERENCES users(id),
                 message TEXT NOT NULL,
                 is_urgent BOOLEAN DEFAULT false,
+                is_read BOOLEAN DEFAULT false,
                 date TEXT NOT NULL
             )`);
 
@@ -190,6 +191,7 @@ const initDb = async () => {
             patient_id INTEGER NOT NULL,
             message TEXT NOT NULL,
             is_urgent BOOLEAN DEFAULT 0,
+            is_read BOOLEAN DEFAULT 0,
             date TEXT NOT NULL,
             FOREIGN KEY(doctor_id) REFERENCES users(id),
             FOREIGN KEY(patient_id) REFERENCES users(id)
