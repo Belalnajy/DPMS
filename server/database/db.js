@@ -136,6 +136,23 @@ const initDb = async () => {
             )`);
 
       console.log('PostgreSQL Tables verified/created.');
+
+      // Auto-Migration for existing databases
+      try {
+        await pool.query(
+          'ALTER TABLE users ADD COLUMN IF NOT EXISTS settings TEXT',
+        );
+        await pool.query(
+          'ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT false',
+        );
+        console.log('Schema migration applied (columns added if missing).');
+      } catch (migrationErr) {
+        console.error(
+          'Migration warning (ignorable if columns exist):',
+          migrationErr.message,
+        );
+      }
+
       await seedDefaultDoctor(pool);
     } catch (err) {
       console.error('Error initializing PostgreSQL:', err.message);
