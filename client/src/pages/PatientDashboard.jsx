@@ -20,7 +20,7 @@ import { DashboardLayout } from '../components/layout';
 import { Card, Badge, Button, Alert, FormInput } from '../components/ui';
 
 const PatientDashboard = () => {
-  const { user } = useContext(AuthContext);
+  const { user, logout } = useContext(AuthContext);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -45,7 +45,11 @@ const PatientDashboard = () => {
       })
       .catch((err) => {
         console.error(err);
-        setError('Failed to load dashboard. Please try again.');
+        if (err.response && err.response.status === 404) {
+          setError('Patient profile not found. Your session may be invalid.');
+        } else {
+          setError('Failed to load dashboard. Please try again.');
+        }
         setLoading(false);
       });
   }, [user, refresh]);
@@ -140,6 +144,13 @@ const PatientDashboard = () => {
                 size="sm"
                 onClick={() => setRefresh((prev) => prev + 1)}>
                 Retry Connection
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={logout}
+                className="ml-2 text-red-600 hover:text-red-700 hover:bg-red-50">
+                Logout
               </Button>
             </div>
           </Alert>
