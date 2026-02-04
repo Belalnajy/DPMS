@@ -15,13 +15,6 @@ const DashboardLayout = ({ children, unreadCount = 0 }) => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <Toaster position="top-center" reverseOrder={false} />
-      {/* Mobile Overlay */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 lg:hidden transition-opacity"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
 
       {/* Sidebar */}
       <Sidebar
@@ -36,9 +29,6 @@ const DashboardLayout = ({ children, unreadCount = 0 }) => {
         <div className="lg:hidden bg-white border-b border-gray-100 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
           <Link to="/" className="flex items-center gap-3">
             <img src="/logo.svg" alt="DiaMonitor Logo" className="h-9 w-auto" />
-            <span className="font-display font-bold text-lg text-gray-900">
-              DiaMonitor
-            </span>
           </Link>
           <button
             onClick={() => setIsSidebarOpen(true)}

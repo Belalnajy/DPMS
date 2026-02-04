@@ -55,13 +55,13 @@ const Sidebar = ({ isOpen, onClose, unreadCount = 0 }) => {
       {/* Backdrop for mobile */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-20 lg:hidden"
+          className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 lg:hidden"
           onClick={onClose}
         />
       )}
 
       <aside
-        className={`fixed left-0 top-0 z-30 h-screen w-72 bg-white border-r border-gray-100 flex flex-col transition-transform duration-300 lg:translate-x-0 shadow-2xl lg:shadow-none ${
+        className={`fixed left-0 top-0 z-50 h-screen w-72 bg-white border-r border-gray-100 flex flex-col transition-transform duration-300 lg:translate-x-0 shadow-2xl lg:shadow-none ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}>
         {/* Logo Section */}
