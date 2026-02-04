@@ -19,12 +19,15 @@ import {
 import { AuthContext } from '../../context/AuthContext';
 import { getProfilePictureUrl } from '../../utils/imageUtils';
 
-const Sidebar = ({ isOpen, onClose }) => {
+const Sidebar = ({ isOpen, onClose, unreadCount = 0 }) => {
   const { user, logout } = useContext(AuthContext);
   const location = useLocation();
   const navigate = useNavigate();
 
   const isActive = (path) => location.pathname === path;
+
+  // Debug logging
+  console.log('Sidebar unreadCount:', unreadCount, 'type:', typeof unreadCount);
 
   // Doctor navigation links
   const doctorLinks = [
@@ -116,6 +119,14 @@ const Sidebar = ({ isOpen, onClose }) => {
                       className={`w-5 h-5 transition-colors ${active ? 'text-primary-600' : 'text-gray-400 group-hover:text-gray-600'}`}
                     />
                     <span className="flex-1">{link.label}</span>
+                    {/* Unread counter for Messages */}
+                    {(link.path === '/patient/messages' ||
+                      link.path === '/doctor/messages') &&
+                      unreadCount > 0 && (
+                        <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
+                          {unreadCount}
+                        </span>
+                      )}
                     {active && (
                       <ChevronRight className="w-4 h-4 text-primary-400" />
                     )}

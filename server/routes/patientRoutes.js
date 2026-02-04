@@ -8,6 +8,7 @@ router.post('/:id/readings', patientController.addReading);
 router.post('/:id/notes', patientController.addWeeklyNote);
 
 router.put('/:id/messages/read-all', patientController.markAllMessagesRead);
+router.post('/:id/messages/send', patientController.sendPatientMessage);
 router.put('/:id/settings', patientController.updateSettings);
 
 module.exports = router;

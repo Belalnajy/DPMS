@@ -34,6 +34,10 @@ const getDashboardData = (req, res) => {
             [patientId],
             (err, msgResult) => {
               data.messages = msgResult.rows || [];
+              // Add unread count (Only count messages NOT sent by the patient themselves)
+              data.unreadCount = data.messages.filter(
+                (m) => !m.is_read && m.sender_id !== parseInt(patientId),
+              ).length;
 
               db.query(
                 'SELECT * FROM glucose_readings WHERE user_id = $1 ORDER BY date DESC, id DESC LIMIT 20',
@@ -120,10 +124,34 @@ const updateSettings = (req, res) => {
   );
 };
 
+// Patient sends message to doctor
+const sendPatientMessage = (req, res) => {
+  const patientId = req.params.id;
+  const { message } = req.body;
+  const date = new Date().toISOString();
+
+  if (!message || !message.trim()) {
+    return res.status(400).json({ error: 'Message is required' });
+  }
+
+  // Get patient's doctor (assuming doctor_id = 1 for now, should be from patient's record)
+  const doctorId = 1; // TODO: Get from patient's assigned doctor
+
+  db.query(
+    'INSERT INTO messages (doctor_id, patient_id, sender_id, message, is_urgent, type, date) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+    [doctorId, patientId, patientId, message, false, 'chat', date],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.status(201).json({ message: 'Message sent to doctor' });
+    },
+  );
+};
+
 module.exports = {
   getDashboardData,
   addReading,
   addWeeklyNote,
   markAllMessagesRead,
   updateSettings,
+  sendPatientMessage,
 };

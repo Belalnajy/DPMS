@@ -15,6 +15,7 @@ const PatientSettings = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const [saved, setSaved] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [targets, setTargets] = useState({
     fastingMin: 70,
     fastingMax: 180,
@@ -33,6 +34,17 @@ const PatientSettings = () => {
         console.error('Error parsing settings', e);
       }
     }
+  }, [user]);
+
+  // Fetch unread count
+  useEffect(() => {
+    if (!user) return;
+    api
+      .get(`/patients/${user.id}/dashboard`)
+      .then((res) => {
+        setUnreadCount(res.data.unreadCount || 0);
+      })
+      .catch((err) => console.error('Failed to load unread count', err));
   }, [user]);
 
   const handleLogout = () => {
@@ -55,7 +67,7 @@ const PatientSettings = () => {
   };
 
   return (
-    <DashboardLayout>
+    <DashboardLayout unreadCount={unreadCount}>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>

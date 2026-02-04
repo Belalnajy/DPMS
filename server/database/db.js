@@ -121,9 +121,11 @@ const initDb = async () => {
                 id SERIAL PRIMARY KEY,
                 doctor_id INTEGER NOT NULL REFERENCES users(id),
                 patient_id INTEGER NOT NULL REFERENCES users(id),
+                sender_id INTEGER NOT NULL REFERENCES users(id),
                 message TEXT NOT NULL,
                 is_urgent BOOLEAN DEFAULT false,
                 is_read BOOLEAN DEFAULT false,
+                type TEXT DEFAULT 'chat',
                 date TEXT NOT NULL
             )`);
 
@@ -144,6 +146,12 @@ const initDb = async () => {
         );
         await pool.query(
           'ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT false',
+        );
+        await pool.query(
+          "ALTER TABLE messages ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'chat'",
+        );
+        await pool.query(
+          'ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_id INTEGER',
         );
         console.log('Schema migration applied (columns added if missing).');
       } catch (migrationErr) {
@@ -206,12 +214,15 @@ const initDb = async () => {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             doctor_id INTEGER NOT NULL,
             patient_id INTEGER NOT NULL,
+            sender_id INTEGER NOT NULL,
             message TEXT NOT NULL,
             is_urgent BOOLEAN DEFAULT 0,
             is_read BOOLEAN DEFAULT 0,
+            type TEXT DEFAULT 'chat',
             date TEXT NOT NULL,
             FOREIGN KEY(doctor_id) REFERENCES users(id),
-            FOREIGN KEY(patient_id) REFERENCES users(id)
+            FOREIGN KEY(patient_id) REFERENCES users(id),
+            FOREIGN KEY(sender_id) REFERENCES users(id)
         )`);
 
       await runAsync(`CREATE TABLE IF NOT EXISTS notes (
@@ -225,8 +236,21 @@ const initDb = async () => {
 
       console.log('SQLite Tables verified/created.');
 
-      // Check for doctor
-      console.log('SQLite Tables verified/created.');
+      // SQLite Migrations
+      try {
+        await runAsync(
+          'ALTER TABLE messages ADD COLUMN is_read BOOLEAN DEFAULT 0',
+        ).catch(() => {});
+        await runAsync(
+          "ALTER TABLE messages ADD COLUMN type TEXT DEFAULT 'chat'",
+        ).catch(() => {});
+        await runAsync(
+          'ALTER TABLE messages ADD COLUMN sender_id INTEGER',
+        ).catch(() => {});
+        console.log('SQLite Schema migration applied.');
+      } catch (migErr) {
+        console.log('SQLite Migration warning:', migErr.message);
+      }
 
       // Check for doctor (Promisified)
       await new Promise((resolve, reject) => {

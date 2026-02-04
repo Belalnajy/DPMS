@@ -55,6 +55,7 @@ const DoctorPatientDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refresh, setRefresh] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Treatment form
   const [treatmentForm, setTreatmentForm] = useState({
@@ -73,12 +74,39 @@ const DoctorPatientDetails = () => {
     is_urgent: false,
   });
   const [messageSuccess, setMessageSuccess] = useState(false);
+  const [activeTab, setActiveTab] = useState('chat'); // 'chat' or 'inquiry'
+
+  const recommendations = [
+    'Urgent Hospital Visit Required',
+    'Follow treatment plan strictly',
+    'Increase water intake',
+    'Reduce carbohydrate consumption',
+    'Schedule a follow-up appointment',
+  ];
 
   useEffect(() => {
     api
       .get(`/doctors/patients/${id}`)
       .then((res) => {
         setPatient(res.data);
+        setUnreadCount(res.data.unreadCount || 0);
+
+        // Mark as read if there are unread messages from this patient
+        const hasUnread = res.data.messages?.some(
+          (m) => !m.is_read && m.sender_id === parseInt(id),
+        );
+
+        if (hasUnread) {
+          api
+            .put(`/doctors/patients/${id}/messages/read`)
+            .then(() => {
+              // Optionally refresh to update local count, but we already have the count from API
+              // For better UX, we could decrement unreadCount locally if we were sure it only counted this patient,
+              // but it's a global count. So we just mark as read on backend.
+            })
+            .catch((err) => console.error('Failed to mark read:', err));
+        }
+
         if (res.data.treatmentPlan) {
           setTreatmentForm({
             breakfast_insulin: res.data.treatmentPlan.breakfast_insulin || '',
@@ -127,14 +155,22 @@ const DoctorPatientDetails = () => {
   };
 
   // Handle message send
-  const handleMessageSubmit = async (e) => {
-    e.preventDefault();
-    if (!messageForm.message.trim()) return;
+  const handleMessageSubmit = async (
+    e,
+    forcedMessage = null,
+    forcedType = 'chat',
+  ) => {
+    if (e) e.preventDefault();
+    const finalMessage = forcedMessage || messageForm.message;
+    if (!finalMessage.trim()) return;
+
     try {
       await api.post(`/doctors/patients/${id}/messages`, {
         doctor_id: user.id,
-        message: messageForm.message,
-        is_urgent: messageForm.is_urgent,
+        message: finalMessage,
+        is_urgent:
+          forcedType === 'recommendation' ? true : messageForm.is_urgent,
+        type: forcedType,
       });
       setMessageForm({ message: '', is_urgent: false });
       setMessageSuccess(true);
@@ -243,7 +279,7 @@ const DoctorPatientDetails = () => {
   };
 
   return (
-    <DashboardLayout>
+    <DashboardLayout unreadCount={unreadCount}>
       {/* Back Button */}
       <Link
         to="/doctor/dashboard"
@@ -280,7 +316,7 @@ const DoctorPatientDetails = () => {
             </div>
           </div>
         </div>
-        {latestStatus && (
+        {latestStatus ? (
           <div className="flex flex-col items-end">
             <div className="text-sm font-medium text-gray-500 mb-1 uppercase tracking-wide text-[0.7rem]">
               Current Status
@@ -289,7 +325,7 @@ const DoctorPatientDetails = () => {
               {latestReading?.value} mg/dL • {latestStatus.label}
             </Badge>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Stats Row */}
@@ -396,11 +432,11 @@ const DoctorPatientDetails = () => {
             <h3 className="text-lg font-bold text-gray-900">Treatment Plan</h3>
           </div>
 
-          {treatmentSuccess && (
+          {treatmentSuccess ? (
             <Alert variant="success" className="mb-4">
               Treatment plan updated successfully!
             </Alert>
-          )}
+          ) : null}
           <form onSubmit={handleTreatmentSubmit} className="space-y-4">
             <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 space-y-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
@@ -502,176 +538,299 @@ const DoctorPatientDetails = () => {
         </Card>
       </div>
 
-      {/* Send Message and Recent Readings */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        {/* Send Message */}
-        <div className="space-y-8">
-          {/* Send Message */}
-          <Card className="h-fit">
-            <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
-              <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
-                <MessageSquare className="w-5 h-5" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">Send Message</h3>
-            </div>
+      {/* Recent Readings List */}
+      <Card className="xl:col-span-2">
+        <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
+          <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
+            <ClipboardList className="w-5 h-5" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900">
+            Recent Readings Log
+          </h3>
+        </div>
 
+        {readings?.length > 0 ? (
+          <div className="overflow-hidden rounded-xl border border-gray-100">
+            <div className="max-h-[400px] overflow-y-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 top-0 sticky z-10 text-xs font-semibold text-gray-500 uppercase">
+                  <tr>
+                    <th className="px-5 py-3">Value</th>
+                    <th className="px-5 py-3">Meal Context</th>
+                    <th className="px-5 py-3">Status</th>
+                    <th className="px-5 py-3 text-right">Date & Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {readings.slice(0, 15).map((reading) => {
+                    const status = getStatusInfo(
+                      reading.value,
+                      reading.meal_type,
+                    );
+                    return (
+                      <tr
+                        key={reading.id}
+                        className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <span className="font-bold text-gray-900">
+                            {reading.value}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-1">
+                            mg/dL
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-gray-600 text-sm capitalize">
+                          {reading.meal_type.replace(/_/g, ' ')}
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <Badge variant={status.variant} className="text-xs">
+                            {status.label}
+                          </Badge>
+                        </td>
+                        <td className="px-5 py-3.5 text-right text-sm text-gray-500 font-mono">
+                          {new Date(reading.date).toLocaleDateString()}{' '}
+                          <span className="text-gray-300">|</span>{' '}
+                          {new Date(reading.date).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="py-12 flex flex-col items-center justify-center text-gray-500">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+              <ClipboardList className="w-8 h-8 text-gray-400" />
+            </div>
+            <p>No readings recorded yet for this patient.</p>
+          </div>
+        )}
+      </Card>
+
+      {/* Messaging & Conversations */}
+      <div className="space-y-6">
+        <Card className="h-[550px] flex flex-col p-0 overflow-hidden shadow-lg border-purple-50">
+          <div className="p-0 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+            <div className="flex w-full">
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                  activeTab === 'chat'
+                    ? 'bg-white text-purple-600 border-b-2 border-purple-600'
+                    : 'text-gray-500 hover:bg-gray-100'
+                }`}>
+                <MessageSquare className="w-4 h-4" />
+                Chat History
+                <Badge variant="default" className="ml-1 text-[0.6rem] px-1.5">
+                  {messages?.length || 0}
+                </Badge>
+              </button>
+              <button
+                onClick={() => setActiveTab('inquiry')}
+                className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                  activeTab === 'inquiry'
+                    ? 'bg-white text-indigo-600 border-b-2 border-indigo-600'
+                    : 'text-gray-500 hover:bg-gray-100'
+                }`}>
+                <FileText className="w-4 h-4" />
+                Patient Inquiries
+                <Badge variant="default" className="ml-1 text-[0.6rem] px-1.5">
+                  {notes?.length || 0}
+                </Badge>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/20">
+            {activeTab === 'chat' && (
+              <>
+                {(messages || [])
+                  .sort((a, b) => new Date(a.date) - new Date(b.date))
+                  .map((msg, idx) => {
+                    const isFromDoctor =
+                      msg.sender_id === user?.id ||
+                      msg.doctor_id === user?.id ||
+                      msg.type === 'recommendation';
+
+                    return (
+                      <div
+                        key={msg.id || idx}
+                        className={`flex ${isFromDoctor ? 'justify-end' : 'justify-start'}`}>
+                        <div
+                          className={`max-w-[85%] rounded-2xl px-4 py-2.5 shadow-sm ${
+                            msg.type === 'recommendation'
+                              ? 'bg-amber-100 border border-amber-200 text-amber-900 shadow-amber-100/50'
+                              : isFromDoctor
+                                ? msg.is_urgent
+                                  ? 'bg-red-500 text-white'
+                                  : 'bg-primary-600 text-white'
+                                : 'bg-white border border-gray-100 text-gray-900'
+                          }`}>
+                          {!isFromDoctor ? (
+                            <div className="flex items-center gap-1.5 mb-1 text-[0.6rem] font-bold uppercase text-indigo-400">
+                              Patient Message
+                            </div>
+                          ) : null}
+                          {msg.type === 'recommendation' ? (
+                            <div className="flex items-center gap-1.5 mb-1.5 pb-1 border-b border-amber-200 text-[0.65rem] font-bold uppercase text-amber-700">
+                              <Activity className="w-3 h-3" />
+                              Doctor Recommendation
+                            </div>
+                          ) : null}
+                          {isFromDoctor &&
+                          Boolean(msg.is_urgent) &&
+                          msg.type !== 'recommendation' ? (
+                            <div className="flex items-center gap-1.5 mb-1 text-[0.65rem] font-bold uppercase text-red-100">
+                              <AlertCircle className="w-3 h-3" />
+                              Urgent Alert
+                            </div>
+                          ) : null}
+                          <p className="text-sm leading-relaxed">
+                            {msg.message}
+                          </p>
+                          <div
+                            className={`text-[0.6rem] mt-1 text-right ${
+                              isFromDoctor &&
+                              msg.is_urgent &&
+                              msg.type !== 'recommendation'
+                                ? 'text-white/70'
+                                : isFromDoctor
+                                  ? 'text-primary-100/70'
+                                  : 'text-gray-400'
+                            }`}>
+                            {new Date(msg.date).toLocaleString([], {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                {!messages?.length ? (
+                  <div className="h-full flex flex-col items-center justify-center text-gray-400 text-center px-6">
+                    <MessageSquare className="w-12 h-12 mb-2 opacity-20" />
+                    <p className="text-sm">No chat history yet.</p>
+                  </div>
+                ) : null}
+              </>
+            )}
+
+            {activeTab === 'inquiry' && (
+              <>
+                {(notes || [])
+                  .sort((a, b) => new Date(a.date) - new Date(b.date))
+                  .map((note, idx) => (
+                    <div key={note.id || idx} className="flex justify-start">
+                      <div className="max-w-[85%] rounded-2xl px-4 py-2.5 shadow-sm bg-white border border-gray-100 text-gray-800">
+                        <div className="flex items-center gap-1.5 mb-1.5 pb-1 border-b border-gray-100 text-[0.65rem] font-bold uppercase text-indigo-600">
+                          <FileText className="w-3 h-3" />
+                          Inquiry - {note.week}
+                        </div>
+                        <p className="text-sm leading-relaxed">{note.text}</p>
+                        <div className="text-[0.6rem] mt-1 text-gray-400">
+                          {new Date(note.date).toLocaleString([], {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                {!notes?.length && (
+                  <div className="h-full flex flex-col items-center justify-center text-gray-400 text-center px-6">
+                    <FileText className="w-12 h-12 mb-2 opacity-20" />
+                    <p className="text-sm">No inquiries from patient yet.</p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="p-4 border-t border-gray-100 bg-white">
             {messageSuccess && (
-              <Alert variant="success" className="mb-4">
-                Message sent successfully!
+              <Alert variant="success" className="mb-3 py-2 text-xs">
+                Sent successfully!
               </Alert>
             )}
-            <form onSubmit={handleMessageSubmit}>
-              <div className="mb-4">
+
+            <div className="mb-4">
+              <div className="text-[0.65rem] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Quick Recommendations
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {recommendations.map((rec) => (
+                  <button
+                    key={rec}
+                    type="button"
+                    onClick={() =>
+                      handleMessageSubmit(null, rec, 'recommendation')
+                    }
+                    className="text-[0.7rem] bg-amber-50 text-amber-700 border border-amber-100 px-2.5 py-1 rounded-md hover:bg-amber-100 transition-colors font-medium">
+                    {rec}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handleMessageSubmit} className="space-y-3">
+              <div className="flex items-start gap-2">
                 <textarea
-                  className="input min-h-[120px] resize-none"
-                  placeholder="Type your message to the patient..."
+                  className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none min-h-[60px]"
+                  placeholder={
+                    activeTab === 'chat'
+                      ? 'Type your message...'
+                      : 'Reply to inquiry...'
+                  }
                   value={messageForm.message}
                   onChange={(e) =>
                     setMessageForm({ ...messageForm, message: e.target.value })
                   }
                   required
                 />
+                <button
+                  type="submit"
+                  className="h-[60px] w-[60px] bg-primary-600 text-white rounded-xl flex items-center justify-center hover:bg-primary-700 transition-colors shadow-md shadow-primary-500/20 disabled:bg-gray-300 disabled:shadow-none"
+                  disabled={!messageForm.message.trim()}>
+                  <Send className="w-5 h-5 ml-0.5" />
+                </button>
               </div>
-              <label className="flex items-center gap-3 mb-6 cursor-pointer p-3 rounded-lg border border-transparent hover:bg-red-50 hover:border-red-100 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={messageForm.is_urgent}
-                  onChange={(e) =>
-                    setMessageForm({
-                      ...messageForm,
-                      is_urgent: e.target.checked,
-                    })
-                  }
-                  className="w-5 h-5 rounded text-red-600 focus:ring-red-500 border-gray-300"
-                />
-                <span
-                  className={`text-sm font-medium ${messageForm.is_urgent ? 'text-red-700' : 'text-gray-700'}`}>
-                  Mark as high priority / urgent alert
-                </span>
-              </label>
-              <Button
-                type="submit"
-                fullWidth
-                variant={messageForm.is_urgent ? 'danger' : 'primary'}
-                className="gap-2">
-                <Send className="w-4 h-4" />
-                {messageForm.is_urgent ? 'Send Urgent Alert' : 'Send Message'}
-              </Button>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="urgent-check"
+                    checked={messageForm.is_urgent}
+                    onChange={(e) =>
+                      setMessageForm({
+                        ...messageForm,
+                        is_urgent: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                  />
+                  <label
+                    htmlFor="urgent-check"
+                    className={`text-xs font-semibold cursor-pointer ${messageForm.is_urgent ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+                    Mark as Urgent alert
+                  </label>
+                </div>
+                <div className="text-[0.6rem] text-gray-400 italic">
+                  * Recommendations are always marked as important for the
+                  patient.
+                </div>
+              </div>
             </form>
-          </Card>
-
-          {/* Patient Notes */}
-          <Card className="max-h-[400px] overflow-y-auto">
-            <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
-              <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                <FileText className="w-5 h-5" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">
-                Patient Inquiries
-              </h3>
-            </div>
-
-            {notes?.length > 0 ? (
-              <div className="space-y-4">
-                {notes.map((note) => (
-                  <div
-                    key={note.id}
-                    className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-gray-700 bg-white px-2 py-1 rounded border border-gray-200 shadow-sm">
-                        {note.week}
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        {new Date(note.date).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <p className="text-gray-700 text-sm whitespace-pre-wrap leading-relaxed">
-                      {note.text}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-400">
-                <FileText className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                <p className="text-sm">No notes submitted.</p>
-              </div>
-            )}
-          </Card>
-        </div>
-
-        {/* Recent Readings List */}
-        <Card className="xl:col-span-2">
-          <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
-            <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
-              <ClipboardList className="w-5 h-5" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900">
-              Recent Readings Log
-            </h3>
           </div>
-
-          {readings?.length > 0 ? (
-            <div className="overflow-hidden rounded-xl border border-gray-100">
-              <div className="max-h-[400px] overflow-y-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-gray-50 top-0 sticky z-10 text-xs font-semibold text-gray-500 uppercase">
-                    <tr>
-                      <th className="px-5 py-3">Value</th>
-                      <th className="px-5 py-3">Meal Context</th>
-                      <th className="px-5 py-3">Status</th>
-                      <th className="px-5 py-3 text-right">Date & Time</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {readings.slice(0, 15).map((reading) => {
-                      const status = getStatusInfo(
-                        reading.value,
-                        reading.meal_type,
-                      );
-                      return (
-                        <tr
-                          key={reading.id}
-                          className="hover:bg-gray-50/50 transition-colors">
-                          <td className="px-5 py-3.5">
-                            <span className="font-bold text-gray-900">
-                              {reading.value}
-                            </span>
-                            <span className="text-xs text-gray-500 ml-1">
-                              mg/dL
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-gray-600 text-sm capitalize">
-                            {reading.meal_type.replace(/_/g, ' ')}
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <Badge variant={status.variant} className="text-xs">
-                              {status.label}
-                            </Badge>
-                          </td>
-                          <td className="px-5 py-3.5 text-right text-sm text-gray-500 font-mono">
-                            {new Date(reading.date).toLocaleDateString()}{' '}
-                            <span className="text-gray-300">|</span>{' '}
-                            {new Date(reading.date).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            <div className="py-12 flex flex-col items-center justify-center text-gray-500">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                <ClipboardList className="w-8 h-8 text-gray-400" />
-              </div>
-              <p>No readings recorded yet for this patient.</p>
-            </div>
-          )}
         </Card>
       </div>
     </DashboardLayout>

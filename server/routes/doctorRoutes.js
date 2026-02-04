@@ -8,4 +8,6 @@ router.put('/patients/:id/treatment', doctorController.updateTreatmentPlan);
 router.post('/patients/:id/messages', doctorController.sendMessage);
 router.get('/messages', doctorController.getAllMessages);
 
+router.put('/patients/:id/messages/read', doctorController.markMessagesRead);
+
 module.exports = router;

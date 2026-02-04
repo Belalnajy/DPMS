@@ -16,16 +16,33 @@ const getAllPatients = (req, res) => {
             'SELECT * FROM glucose_readings WHERE user_id = $1 ORDER BY date DESC, id DESC LIMIT 1',
             [patient.id],
             (err, readingResult) => {
-              patient.latestReading = readingResult.rows
-                ? readingResult.rows[0]
-                : null;
+              if (err) {
+                patient.latestReading = null;
+              } else {
+                patient.latestReading =
+                  readingResult.rows && readingResult.rows.length > 0
+                    ? readingResult.rows[0]
+                    : null;
+              }
               resolve(patient);
             },
           );
         });
       });
 
-      Promise.all(promises).then((data) => res.json(data));
+      Promise.all(promises).then((data) => {
+        db.query(
+          'SELECT COUNT(*) as count FROM messages WHERE is_read = false AND sender_id = patient_id',
+          [],
+          (err, unreadResult) => {
+            const unreadCount =
+              unreadResult.rows && unreadResult.rows.length > 0
+                ? parseInt(unreadResult.rows[0].count)
+                : 0;
+            res.json({ patients: data, unreadCount });
+          },
+        );
+      });
     },
   );
 };
@@ -54,14 +71,37 @@ const getPatientDetails = (req, res) => {
             'SELECT * FROM glucose_readings WHERE user_id = $1 ORDER BY date DESC',
             [patientId],
             (err, readingResult) => {
+              if (err) return res.status(500).json({ error: err.message });
               data.readings = readingResult.rows || [];
 
               db.query(
-                'SELECT * FROM notes WHERE patient_id = $1 ORDER BY date DESC',
+                'SELECT * FROM messages WHERE patient_id = $1 ORDER BY date ASC',
                 [patientId],
-                (err, noteResult) => {
-                  data.notes = noteResult.rows || [];
-                  res.json(data);
+                (err, messageResult) => {
+                  if (err) return res.status(500).json({ error: err.message });
+                  data.messages = messageResult.rows || [];
+
+                  db.query(
+                    'SELECT * FROM notes WHERE patient_id = $1 ORDER BY date DESC',
+                    [patientId],
+                    (err, noteResult) => {
+                      if (err)
+                        return res.status(500).json({ error: err.message });
+                      data.notes = noteResult.rows || [];
+
+                      // Add global unread count
+                      db.query(
+                        'SELECT COUNT(*) as count FROM messages WHERE is_read = false AND sender_id = patient_id',
+                        [],
+                        (err, unreadResult) => {
+                          data.unreadCount = unreadResult.rows
+                            ? parseInt(unreadResult.rows[0].count)
+                            : 0;
+                          res.json(data);
+                        },
+                      );
+                    },
+                  );
                 },
               );
             },
@@ -132,13 +172,24 @@ const updateTreatmentPlan = (req, res) => {
 
 // Send Message / Alert
 const sendMessage = (req, res) => {
-  const { doctor_id, message, is_urgent } = req.body;
+  const { doctor_id, message, is_urgent, type } = req.body;
   const patientId = req.params.id;
   const date = new Date().toISOString();
 
+  // type can be 'chat' or 'recommendation'
+  const messageType = type || 'chat';
+
   db.query(
-    'INSERT INTO messages (doctor_id, patient_id, message, is_urgent, date) VALUES ($1, $2, $3, $4, $5)',
-    [doctor_id, patientId, message, is_urgent ? true : false, date],
+    'INSERT INTO messages (doctor_id, patient_id, sender_id, message, is_urgent, type, date) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+    [
+      doctor_id,
+      patientId,
+      doctor_id, // doctor is the sender
+      message,
+      is_urgent ? true : false,
+      messageType,
+      date,
+    ],
     (err) => {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json({ message: 'Message sent' });
@@ -146,10 +197,27 @@ const sendMessage = (req, res) => {
   );
 };
 
-// Get all messages sent by doctors
+// Mark messages from a patient as read
+const markMessagesRead = (req, res) => {
+  const patientId = req.params.id;
+
+  db.query(
+    'UPDATE messages SET is_read = true WHERE patient_id = $1 AND sender_id = $1',
+    [patientId],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ message: 'Messages marked as read' });
+    },
+  );
+};
+
+// Get all messages for the doctor view (grouped by patient logic is handled in the frontend)
 const getAllMessages = (req, res) => {
   db.query(
-    'SELECT m.*, u.name as patient_name, u.national_id as patient_national_id FROM messages m JOIN users u ON m.patient_id = u.id ORDER BY m.date DESC',
+    `SELECT m.*, u.name as patient_name, u.national_id as patient_national_id 
+     FROM messages m 
+     JOIN users u ON m.patient_id = u.id 
+     ORDER BY m.date DESC`,
     [],
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -164,4 +232,5 @@ module.exports = {
   updateTreatmentPlan,
   sendMessage,
   getAllMessages,
+  markMessagesRead,
 };

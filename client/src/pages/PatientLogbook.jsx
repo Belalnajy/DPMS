@@ -22,6 +22,7 @@ const PatientLogbook = () => {
   const { user } = useContext(AuthContext);
   const [readings, setReadings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -29,6 +30,7 @@ const PatientLogbook = () => {
       .get(`/patients/${user.id}/dashboard`)
       .then((res) => {
         setReadings(res.data.readings || []);
+        setUnreadCount(res.data.unreadCount || 0);
         setLoading(false);
       })
       .catch((err) => {
@@ -98,7 +100,7 @@ const PatientLogbook = () => {
   }
 
   return (
-    <DashboardLayout>
+    <DashboardLayout unreadCount={unreadCount}>
       {/* Note Modal */}
       {showNoteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">

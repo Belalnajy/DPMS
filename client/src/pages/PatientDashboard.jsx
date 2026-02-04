@@ -13,11 +13,14 @@ import {
   ChevronRight,
   Plus,
   Utensils,
+  Send,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { AuthContext } from '../context/AuthContext';
 import api from '../services/api';
 import { DashboardLayout } from '../components/layout';
 import { Card, Badge, Button, Alert, FormInput } from '../components/ui';
+import { Link } from 'react-router-dom';
 
 const PatientDashboard = () => {
   const { user, logout } = useContext(AuthContext);
@@ -31,6 +34,8 @@ const PatientDashboard = () => {
     value: '',
     meal_type: 'before_breakfast',
   });
+  const [newMessage, setNewMessage] = useState('');
+  const [sending, setSending] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [submitSuccess, setSubmitSuccess] = useState(null);
 
@@ -40,6 +45,8 @@ const PatientDashboard = () => {
     api
       .get(`/patients/${user.id}/dashboard`)
       .then((res) => {
+        console.log('PatientDashboard API Response:', res.data);
+        console.log('unreadCount from API:', res.data.unreadCount);
         setData(res.data);
         setLoading(false);
       })
@@ -119,6 +126,27 @@ const PatientDashboard = () => {
     }
   };
 
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+
+    setSending(true);
+    try {
+      await api.post(`/patients/${user.id}/messages/send`, {
+        message: newMessage,
+      });
+
+      toast.success('Message sent to Dr. Ayman');
+      setNewMessage('');
+      setRefresh((prev) => prev + 1);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to send message');
+    } finally {
+      setSending(false);
+    }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -159,7 +187,7 @@ const PatientDashboard = () => {
     );
   }
 
-  const { patient, treatmentPlan, messages, readings } = data;
+  const { patient, treatmentPlan, messages, readings, unreadCount } = data;
   const latestReading = readings?.[0];
   const latestStatus = latestReading
     ? getStatusInfo(latestReading.value, latestReading.meal_type)
@@ -170,8 +198,40 @@ const PatientDashboard = () => {
     ? Math.round(readings.reduce((a, b) => a + b.value, 0) / readings.length)
     : 0;
 
+  // Calculate today's stats
+  const today = new Date().toDateString();
+  const todayReadings =
+    readings?.filter((r) => new Date(r.date).toDateString() === today) || [];
+
+  const todayAvg = todayReadings.length
+    ? Math.round(
+        todayReadings.reduce((a, b) => a + b.value, 0) / todayReadings.length,
+      )
+    : null;
+
+  const highestToday = todayReadings.length
+    ? todayReadings.reduce(
+        (max, r) => (r.value > max.value ? r : max),
+        todayReadings[0],
+      )
+    : null;
+
+  const lowestToday = todayReadings.length
+    ? todayReadings.reduce(
+        (min, r) => (r.value < min.value ? r : min),
+        todayReadings[0],
+      )
+    : null;
+
+  console.log(
+    'PatientDashboard unreadCount:',
+    unreadCount,
+    'from data:',
+    data.unreadCount,
+  );
+
   return (
-    <DashboardLayout>
+    <DashboardLayout unreadCount={unreadCount || 0}>
       {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -194,17 +254,53 @@ const PatientDashboard = () => {
         </div>
       </div>
 
-      {/* Urgent Messages */}
-      {messages?.filter((m) => m.is_urgent)?.length > 0 && (
+      {/* Medical Recommendations */}
+      {messages?.filter((m) => m.type === 'recommendation')?.length > 0 ? (
+        <div className="mb-8 space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="w-5 h-5 text-amber-600" />
+            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">
+              Latest Medical Recommendations
+            </h3>
+          </div>
+          {messages
+            .filter((m) => m.type === 'recommendation')
+            .slice(0, 2)
+            .map((rec) => (
+              <Alert
+                key={rec.id}
+                variant="warning"
+                title="Doctor's Advice"
+                className="shadow-sm border-amber-100 bg-amber-50/50">
+                <div className="flex flex-col gap-1">
+                  <span className="text-amber-900 font-medium">
+                    {rec.message}
+                  </span>
+                  <span className="text-[0.65rem] text-amber-600 font-mono">
+                    {new Date(rec.date).toLocaleString()}
+                  </span>
+                </div>
+              </Alert>
+            ))}
+        </div>
+      ) : null}
+
+      {/* Urgent Messages (non-recommendation) */}
+      {messages?.filter((m) => m.is_urgent && m.type !== 'recommendation')
+        ?.length > 0 ? (
         <Alert
           variant="error"
           title="Important Medical Alert"
           className="mb-8 shadow-md border-red-100">
-          {messages.filter((m) => m.is_urgent)[0].message}
+          {
+            messages.filter(
+              (m) => m.is_urgent && m.type !== 'recommendation',
+            )[0].message
+          }
         </Alert>
-      )}
+      ) : null}
 
-      {/* Stats Cards */}
+      {/* Stats Cards ... (omitted for brevity, but I need to include them in the replace) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card className="relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
@@ -239,37 +335,68 @@ const PatientDashboard = () => {
           </div>
           <div className="flex items-center justify-between mb-4">
             <span className="text-gray-500 font-medium text-sm">
-              7-Day Average
+              Today's Average
             </span>
             <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
               <TrendingUp className="w-5 h-5" />
             </div>
           </div>
           <div className="text-3xl font-bold text-gray-900 tracking-tight mb-1">
-            {avgGlucose || '—'}
+            {todayAvg || '—'}
+            {todayAvg ? (
+              <span className="text-base font-medium text-gray-400 ml-1">
+                mg/dL
+              </span>
+            ) : null}
           </div>
           <div className="flex items-center gap-2 h-6">
-            <span className="text-sm text-gray-500">Average glucose level</span>
+            {todayAvg ? (
+              <span className="text-sm text-gray-500">
+                {todayReadings.length} reading
+                {todayReadings.length !== 1 ? 's' : ''} today
+              </span>
+            ) : (
+              <span className="text-sm text-gray-400">No data today</span>
+            )}
           </div>
         </Card>
 
         <Card className="relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-            <ClipboardList className="w-24 h-24" />
+            <Activity className="w-24 h-24" />
           </div>
           <div className="flex items-center justify-between mb-4">
             <span className="text-gray-500 font-medium text-sm">
-              Total Logs
+              Highest Today
             </span>
-            <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
-              <ClipboardList className="w-5 h-5" />
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                highestToday && highestToday.value > 180
+                  ? 'bg-red-50 text-red-600'
+                  : 'bg-orange-50 text-orange-600'
+              }`}>
+              <Activity className="w-5 h-5" />
             </div>
           </div>
           <div className="text-3xl font-bold text-gray-900 tracking-tight mb-1">
-            {readings?.length || 0}
+            {highestToday?.value || '—'}
+            {highestToday ? (
+              <span className="text-base font-medium text-gray-400 ml-1">
+                mg/dL
+              </span>
+            ) : null}
           </div>
           <div className="flex items-center gap-2 h-6">
-            <span className="text-sm text-gray-500">Readings recorded</span>
+            {highestToday ? (
+              <span className="text-sm text-gray-500 font-mono">
+                {new Date(highestToday.date).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+            ) : (
+              <span className="text-sm text-gray-400">No data today</span>
+            )}
           </div>
         </Card>
 
@@ -516,6 +643,135 @@ const PatientDashboard = () => {
                 <p>No treatment plan assigned yet.</p>
               </div>
             )}
+          </Card>
+
+          {/* Recent Messages from Doctor */}
+          <Card>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
+                  <MessageCircle className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">Doctor Chat</h3>
+              </div>
+              {unreadCount > 0 ? (
+                <div className="flex items-center gap-1.5 bg-red-100 text-red-700 px-2.5 py-1 rounded-full animate-pulse">
+                  <span className="font-bold text-sm">{unreadCount}</span>
+                  <span className="text-xs">New</span>
+                </div>
+              ) : null}
+            </div>
+
+            {messages?.filter((m) => m.type !== 'recommendation')?.length >
+            0 ? (
+              <div className="space-y-4">
+                {messages
+                  .filter((m) => m.type !== 'recommendation')
+                  .slice(0, 3)
+                  .map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`p-4 rounded-xl border transition-all ${
+                        msg.is_urgent
+                          ? 'bg-red-50 border-red-200 shadow-sm'
+                          : 'bg-gray-50 border-gray-100'
+                      }`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs font-bold text-gray-700">
+                          Dr. Ayman
+                        </span>
+                        {Boolean(msg.is_urgent) ? (
+                          <Badge variant="danger" className="text-[0.6rem]">
+                            URGENT
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="text-sm text-gray-700 leading-relaxed">
+                        {msg.message}
+                      </p>
+                      <div className="text-[0.65rem] text-gray-400 mt-1 font-mono">
+                        {new Date(msg.date).toLocaleDateString()}
+                      </div>
+                    </div>
+                  ))}
+
+                {/* Quick Reply Form */}
+                <div className="pt-4 border-t border-gray-100">
+                  <form onSubmit={handleSendMessage} className="space-y-3">
+                    <textarea
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none h-[80px]"
+                      placeholder="Type a quick reply..."
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      required
+                      disabled={sending}
+                    />
+                    <div className="flex items-center justify-between">
+                      <Link
+                        to="/patient/messages"
+                        className="text-[0.7rem] text-primary-600 font-bold hover:underline">
+                        View Chat History
+                      </Link>
+                      <button
+                        type="submit"
+                        disabled={!newMessage.trim() || sending}
+                        className="bg-primary-600 text-white rounded-lg px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 hover:bg-primary-700 transition-colors disabled:bg-gray-300">
+                        <Send className="w-3 h-3" />
+                        {sending ? '...' : 'Send'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                <p className="text-sm">No messages yet</p>
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <form onSubmit={handleSendMessage} className="space-y-3">
+                    <textarea
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none h-[80px]"
+                      placeholder="Start a conversation..."
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      required
+                      disabled={sending}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!newMessage.trim() || sending}
+                      className="w-full bg-primary-600 text-white rounded-xl py-2 text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors disabled:bg-gray-300">
+                      <Send className="w-4 h-4" />
+                      {sending ? 'Sending...' : 'Send Message'}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          <Card className="bg-indigo-50 border-indigo-100">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
+                <ClipboardList className="w-5 h-5" />
+              </div>
+              <h3 className="text-md font-bold text-indigo-900">
+                Inquiry History
+              </h3>
+            </div>
+            <p className="text-xs text-indigo-700 mb-4">
+              View your previous questions and observations sent to the doctor.
+            </p>
+            <Link to="/patient/logbook">
+              <Button
+                variant="outline"
+                fullWidth
+                size="sm"
+                className="bg-white border-indigo-200 text-indigo-600 hover:bg-indigo-50">
+                View All Inquiries
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
           </Card>
         </div>
       </div>

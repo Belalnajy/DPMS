@@ -9,7 +9,7 @@ import { Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
-const DashboardLayout = ({ children }) => {
+const DashboardLayout = ({ children, unreadCount = 0 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
@@ -24,7 +24,11 @@ const DashboardLayout = ({ children }) => {
       )}
 
       {/* Sidebar */}
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        unreadCount={unreadCount}
+      />
 
       {/* Main Content Area */}
       <main className="flex-1 lg:ml-72 w-full min-w-0 transition-all duration-300 flex flex-col min-h-screen">
