@@ -88,23 +88,23 @@ const PatientMessages = () => {
 
   return (
     <DashboardLayout unreadCount={unreadCount}>
-      <div className="flex flex-col h-[calc(100vh-120px)] lg:h-[calc(100vh-160px)] overflow-hidden">
-        {/* Header - Fixed Height */}
-        <div className="mb-4 shrink-0 px-2">
+      <div className="flex flex-col h-[calc(100vh-80px)] lg:h-[calc(100vh-100px)] overflow-hidden">
+        {/* Header - Ultra Compact */}
+        <div className="mb-2 lg:mb-3 shrink-0 px-2 mt-1">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl lg:text-2xl font-bold text-gray-900 leading-none">
                 Health Communications
               </h1>
-              <p className="text-gray-500 text-sm">
-                Chat securely with Dr. Ayman
-              </p>
+              <Badge
+                variant="default"
+                className="text-[0.6rem] px-2 py-0.5 bg-white border border-gray-100 shadow-sm">
+                {messages.length} messages
+              </Badge>
             </div>
-            <Badge
-              variant="default"
-              className="text-xs px-3 py-1 bg-white border border-gray-100 shadow-sm">
-              {messages.length} messages
-            </Badge>
+            <p className="hidden md:block text-gray-500 text-xs">
+              Secure chat with Dr. Ayman
+            </p>
           </div>
         </div>
 
@@ -143,14 +143,16 @@ const PatientMessages = () => {
           <div className="lg:col-span-3 h-full flex flex-col min-h-0">
             <Card className="flex-1 flex flex-col p-0 overflow-hidden shadow-lg border-gray-100 min-h-0 bg-white">
               {/* Conversation Header */}
-              <div className="px-6 py-3 border-b border-gray-100 bg-white flex items-center gap-3 shrink-0">
-                <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 shadow-sm">
-                  <User className="w-4 h-4" />
+              <div className="px-4 py-2 lg:px-6 lg:py-3 border-b border-gray-100 bg-white flex items-center gap-3 shrink-0">
+                <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 shadow-sm">
+                  <User className="w-4 h-4 lg:w-4.5 lg:h-4.5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-900 text-sm">Dr. Ayman</h3>
+                  <h3 className="font-bold text-gray-900 text-xs lg:text-sm">
+                    Dr. Ayman
+                  </h3>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                    <span className="w-1 h-1 lg:w-1.5 lg:h-1.5 rounded-full bg-green-500"></span>
                     <span className="text-[0.6rem] text-gray-500 font-medium uppercase tracking-wider">
                       Online Support
                     </span>
@@ -258,7 +260,7 @@ const PatientMessages = () => {
               </div>
 
               {/* Message Input - Fixed at bottom of Card */}
-              <div className="p-4 border-t border-gray-100 bg-white shrink-0">
+              <div className="p-2 lg:p-4 border-t border-gray-100 bg-white shrink-0">
                 <form onSubmit={handleSendMessage} className="flex gap-2">
                   <textarea
                     className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none min-h-[44px] max-h-[100px]"

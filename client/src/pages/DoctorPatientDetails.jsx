@@ -76,6 +76,15 @@ const DoctorPatientDetails = () => {
   const [messageSuccess, setMessageSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState('chat'); // 'chat' or 'inquiry'
 
+  // Glucose Targets management
+  const [targets, setTargets] = useState({
+    fastingMin: 70,
+    fastingMax: 180,
+    postMealMin: 100,
+    postMealMax: 220,
+  });
+  const [targetsSuccess, setTargetsSuccess] = useState(false);
+
   const recommendations = [
     'Urgent Hospital Visit Required',
     'Follow treatment plan strictly',
@@ -119,6 +128,19 @@ const DoctorPatientDetails = () => {
               res.data.treatmentPlan.diet_recommendations || '',
           });
         }
+
+        // Parse patient settings for targets
+        if (res.data.user && res.data.user.settings) {
+          try {
+            const parsed = JSON.parse(res.data.user.settings);
+            if (parsed.glucoseTargets) {
+              setTargets(parsed.glucoseTargets);
+            }
+          } catch (e) {
+            console.error('Error parsing settings', e);
+          }
+        }
+
         setLoading(false);
       })
       .catch((err) => {
@@ -128,16 +150,18 @@ const DoctorPatientDetails = () => {
       });
   }, [id, refresh]);
 
-  // Get status info
+  // Get status info using patient-specific targets
   const getStatusInfo = (value, mealType) => {
     const isAfter = mealType?.includes('after');
     if (!isAfter) {
-      if (value < 70) return { label: 'Low', variant: 'low' };
-      if (value <= 180) return { label: 'Normal', variant: 'normal' };
+      if (value < targets.fastingMin) return { label: 'Low', variant: 'low' };
+      if (value <= targets.fastingMax)
+        return { label: 'Normal', variant: 'normal' };
       return { label: 'High', variant: 'high' };
     } else {
-      if (value < 100) return { label: 'Low', variant: 'low' };
-      if (value <= 220) return { label: 'Normal', variant: 'normal' };
+      if (value < targets.postMealMin) return { label: 'Low', variant: 'low' };
+      if (value <= targets.postMealMax)
+        return { label: 'Normal', variant: 'normal' };
       return { label: 'High', variant: 'high' };
     }
   };
@@ -151,6 +175,19 @@ const DoctorPatientDetails = () => {
       setTimeout(() => setTreatmentSuccess(false), 3000);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  // Handle targets update
+  const handleTargetsSave = async () => {
+    try {
+      const settings = JSON.stringify({ glucoseTargets: targets });
+      await api.put(`/doctors/patients/${id}/settings`, { settings });
+      setTargetsSuccess(true);
+      setTimeout(() => setTargetsSuccess(false), 3000);
+    } catch (err) {
+      console.error('Failed to save targets', err);
+      alert('Failed to save glucose targets');
     }
   };
 
@@ -392,225 +429,341 @@ const DoctorPatientDetails = () => {
         </Card>
       </div>
 
-      {/* Chart and Treatment */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
-        {/* Glucose Trend Chart */}
-        <Card className="xl:col-span-2 flex flex-col h-[500px]">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8 items-start">
+        {/* Left Column: Data & Trends */}
+        <div className="xl:col-span-2 space-y-8">
+          {/* Glucose Trend Chart */}
+          <Card className="flex flex-col h-[500px]">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-teal-50 rounded-lg text-teal-600">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Glucose Trends
+                </h3>
+              </div>
+              <select className="text-sm border-gray-200 rounded-lg text-gray-600 focus:ring-primary-500 focus:border-primary-500">
+                <option>Last 14 Days</option>
+                <option>Last 30 Days</option>
+              </select>
+            </div>
+
+            <div className="flex-1 w-full min-h-0">
+              {readings?.length > 0 ? (
+                <Line data={chartData} options={chartOptions} />
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                  <Activity className="w-12 h-12 mb-3 stroke-1" />
+                  <p>No enough data to display trends</p>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Recent Readings List */}
+          <Card>
+            <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
+              <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
+                <ClipboardList className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">
+                Recent Readings Log
+              </h3>
+            </div>
+
+            {readings?.length > 0 ? (
+              <div className="overflow-hidden rounded-xl border border-gray-100">
+                <div className="max-h-[400px] overflow-y-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-gray-50 top-0 sticky z-10 text-xs font-semibold text-gray-500 uppercase">
+                      <tr>
+                        <th className="px-5 py-3">Value</th>
+                        <th className="px-5 py-3">Meal Context</th>
+                        <th className="px-5 py-3">Status</th>
+                        <th className="px-5 py-3 text-right">Date & Time</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {readings.slice(0, 15).map((reading) => {
+                        const status = getStatusInfo(
+                          reading.value,
+                          reading.meal_type,
+                        );
+                        return (
+                          <tr
+                            key={reading.id}
+                            className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-5 py-3.5">
+                              <span className="font-bold text-gray-900">
+                                {reading.value}
+                              </span>
+                              <span className="text-xs text-gray-500 ml-1">
+                                mg/dL
+                              </span>
+                            </td>
+                            <td className="px-5 py-3.5 text-gray-600 text-sm capitalize">
+                              {reading.meal_type.replace(/_/g, ' ')}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <Badge
+                                variant={status.variant}
+                                className="text-xs">
+                                {status.label}
+                              </Badge>
+                            </td>
+                            <td className="px-5 py-3.5 text-right text-sm text-gray-500 font-mono">
+                              {new Date(reading.date).toLocaleDateString()}{' '}
+                              <span className="text-gray-300">|</span>{' '}
+                              {new Date(reading.date).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="py-12 flex flex-col items-center justify-center text-gray-500">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                  <ClipboardList className="w-8 h-8 text-gray-400" />
+                </div>
+                <p>No readings recorded yet for this patient.</p>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Right Column: Treatment & Management */}
+        <div className="xl:col-span-1 space-y-8">
+          {/* Update Treatment Plan */}
+          <Card>
+            <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
+              <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+                <FileText className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">
+                Treatment Plan
+              </h3>
+            </div>
+
+            {treatmentSuccess ? (
+              <Alert variant="success" className="mb-4">
+                Treatment plan updated successfully!
+              </Alert>
+            ) : null}
+            <form onSubmit={handleTreatmentSubmit} className="space-y-4">
+              <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 space-y-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <Syringe className="w-4 h-4 text-primary-500" />
+                  Insulin Dosage (Units)
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormInput
+                    label="Breakfast"
+                    type="number"
+                    placeholder="0"
+                    value={treatmentForm.breakfast_insulin}
+                    onChange={(e) =>
+                      setTreatmentForm({
+                        ...treatmentForm,
+                        breakfast_insulin: e.target.value,
+                      })
+                    }
+                    className="bg-white"
+                  />
+                  <FormInput
+                    label="Lunch"
+                    type="number"
+                    placeholder="0"
+                    value={treatmentForm.lunch_insulin}
+                    onChange={(e) =>
+                      setTreatmentForm({
+                        ...treatmentForm,
+                        lunch_insulin: e.target.value,
+                      })
+                    }
+                    className="bg-white"
+                  />
+                  <FormInput
+                    label="Dinner"
+                    type="number"
+                    placeholder="0"
+                    value={treatmentForm.dinner_insulin}
+                    onChange={(e) =>
+                      setTreatmentForm({
+                        ...treatmentForm,
+                        dinner_insulin: e.target.value,
+                      })
+                    }
+                    className="bg-white"
+                  />
+                  <FormInput
+                    label="Long-acting"
+                    type="number"
+                    placeholder="0"
+                    value={treatmentForm.long_acting_insulin}
+                    onChange={(e) =>
+                      setTreatmentForm({
+                        ...treatmentForm,
+                        long_acting_insulin: e.target.value,
+                      })
+                    }
+                    className="bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <FormInput
+                  label="Medication (Pills Dosage)"
+                  placeholder="e.g., Metformin 500mg"
+                  value={treatmentForm.medication}
+                  onChange={(e) =>
+                    setTreatmentForm({
+                      ...treatmentForm,
+                      medication: e.target.value,
+                    })
+                  }
+                />
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide text-[0.7rem]">
+                    Diet Recommendations
+                  </label>
+                  <textarea
+                    className="input min-h-[100px] resize-none"
+                    placeholder="Enter diet recommendations..."
+                    value={treatmentForm.diet_recommendations}
+                    onChange={(e) =>
+                      setTreatmentForm({
+                        ...treatmentForm,
+                        diet_recommendations: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <Button type="submit" fullWidth className="gap-2">
+                  <Save className="w-4 h-4" /> Save Changes
+                </Button>
+              </div>
+            </form>
+          </Card>
+
+          {/* Glucose Targets Management */}
+          <Card>
+            <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
               <div className="p-2 bg-teal-50 rounded-lg text-teal-600">
                 <Activity className="w-5 h-5" />
               </div>
               <h3 className="text-lg font-bold text-gray-900">
-                Glucose Trends
+                Glucose Targets
               </h3>
             </div>
-            <select className="text-sm border-gray-200 rounded-lg text-gray-600 focus:ring-primary-500 focus:border-primary-500">
-              <option>Last 14 Days</option>
-              <option>Last 30 Days</option>
-            </select>
-          </div>
 
-          <div className="flex-1 w-full min-h-0">
-            {readings?.length > 0 ? (
-              <Line data={chartData} options={chartOptions} />
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                <Activity className="w-12 h-12 mb-3 stroke-1" />
-                <p>No enough data to display trends</p>
-              </div>
+            <p className="text-sm text-gray-500 mb-6">
+              Define reference ranges for charts and status alerts.
+            </p>
+
+            {targetsSuccess && (
+              <Alert variant="success" className="mb-4">
+                Targets updated successfully!
+              </Alert>
             )}
-          </div>
-        </Card>
 
-        {/* Update Treatment Plan */}
-        <Card>
-          <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
-            <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-              <FileText className="w-5 h-5" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900">Treatment Plan</h3>
-          </div>
-
-          {treatmentSuccess ? (
-            <Alert variant="success" className="mb-4">
-              Treatment plan updated successfully!
-            </Alert>
-          ) : null}
-          <form onSubmit={handleTreatmentSubmit} className="space-y-4">
-            <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 space-y-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <Syringe className="w-4 h-4 text-primary-500" />
-                Insulin Dosage (Units)
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <FormInput
-                  label="Breakfast"
-                  type="number"
-                  placeholder="0"
-                  value={treatmentForm.breakfast_insulin}
-                  onChange={(e) =>
-                    setTreatmentForm({
-                      ...treatmentForm,
-                      breakfast_insulin: e.target.value,
-                    })
-                  }
-                  className="bg-white"
-                />
-                <FormInput
-                  label="Lunch"
-                  type="number"
-                  placeholder="0"
-                  value={treatmentForm.lunch_insulin}
-                  onChange={(e) =>
-                    setTreatmentForm({
-                      ...treatmentForm,
-                      lunch_insulin: e.target.value,
-                    })
-                  }
-                  className="bg-white"
-                />
-                <FormInput
-                  label="Dinner"
-                  type="number"
-                  placeholder="0"
-                  value={treatmentForm.dinner_insulin}
-                  onChange={(e) =>
-                    setTreatmentForm({
-                      ...treatmentForm,
-                      dinner_insulin: e.target.value,
-                    })
-                  }
-                  className="bg-white"
-                />
-                <FormInput
-                  label="Long-acting"
-                  type="number"
-                  placeholder="0"
-                  value={treatmentForm.long_acting_insulin}
-                  onChange={(e) =>
-                    setTreatmentForm({
-                      ...treatmentForm,
-                      long_acting_insulin: e.target.value,
-                    })
-                  }
-                  className="bg-white"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <FormInput
-                label="Medication (Pills Dosage)"
-                placeholder="e.g., Metformin 500mg"
-                value={treatmentForm.medication}
-                onChange={(e) =>
-                  setTreatmentForm({
-                    ...treatmentForm,
-                    medication: e.target.value,
-                  })
-                }
-              />
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide text-[0.7rem]">
-                  Diet Recommendations
+            <div className="space-y-6">
+              <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 space-y-4">
+                <label className="text-sm font-semibold text-gray-700 block text-[0.7rem] uppercase tracking-wider">
+                  Target Range (Fasting)
                 </label>
-                <textarea
-                  className="input min-h-[100px] resize-none"
-                  placeholder="Enter diet recommendations..."
-                  value={treatmentForm.diet_recommendations}
-                  onChange={(e) =>
-                    setTreatmentForm({
-                      ...treatmentForm,
-                      diet_recommendations: e.target.value,
-                    })
-                  }
-                />
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      value={targets.fastingMin}
+                      onChange={(e) =>
+                        setTargets({
+                          ...targets,
+                          fastingMin: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      className="input w-full text-center bg-white"
+                      placeholder="Min"
+                    />
+                  </div>
+                  <span className="text-gray-400 font-bold">—</span>
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      value={targets.fastingMax}
+                      onChange={(e) =>
+                        setTargets({
+                          ...targets,
+                          fastingMax: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      className="input w-full text-center bg-white"
+                      placeholder="Max"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 space-y-4">
+                <label className="text-sm font-semibold text-gray-700 block text-[0.7rem] uppercase tracking-wider">
+                  Target Range (Post-meal)
+                </label>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      value={targets.postMealMin}
+                      onChange={(e) =>
+                        setTargets({
+                          ...targets,
+                          postMealMin: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      className="input w-full text-center bg-white"
+                      placeholder="Min"
+                    />
+                  </div>
+                  <span className="text-gray-400 font-bold">—</span>
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      value={targets.postMealMax}
+                      onChange={(e) =>
+                        setTargets({
+                          ...targets,
+                          postMealMax: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      className="input w-full text-center bg-white"
+                      placeholder="Max"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <Button onClick={handleTargetsSave} fullWidth className="gap-2">
+                  <Save className="w-4 h-4" /> Save Targets
+                </Button>
               </div>
             </div>
-
-            <div className="pt-2">
-              <Button type="submit" fullWidth className="gap-2">
-                <Save className="w-4 h-4" /> Save Changes
-              </Button>
-            </div>
-          </form>
-        </Card>
+          </Card>
+        </div>
       </div>
 
-      {/* Recent Readings List */}
-      <Card className="xl:col-span-2">
-        <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
-          <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
-            <ClipboardList className="w-5 h-5" />
-          </div>
-          <h3 className="text-lg font-bold text-gray-900">
-            Recent Readings Log
-          </h3>
-        </div>
-
-        {readings?.length > 0 ? (
-          <div className="overflow-hidden rounded-xl border border-gray-100">
-            <div className="max-h-[400px] overflow-y-auto">
-              <table className="w-full text-left">
-                <thead className="bg-gray-50 top-0 sticky z-10 text-xs font-semibold text-gray-500 uppercase">
-                  <tr>
-                    <th className="px-5 py-3">Value</th>
-                    <th className="px-5 py-3">Meal Context</th>
-                    <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3 text-right">Date & Time</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {readings.slice(0, 15).map((reading) => {
-                    const status = getStatusInfo(
-                      reading.value,
-                      reading.meal_type,
-                    );
-                    return (
-                      <tr
-                        key={reading.id}
-                        className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-5 py-3.5">
-                          <span className="font-bold text-gray-900">
-                            {reading.value}
-                          </span>
-                          <span className="text-xs text-gray-500 ml-1">
-                            mg/dL
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 text-gray-600 text-sm capitalize">
-                          {reading.meal_type.replace(/_/g, ' ')}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <Badge variant={status.variant} className="text-xs">
-                            {status.label}
-                          </Badge>
-                        </td>
-                        <td className="px-5 py-3.5 text-right text-sm text-gray-500 font-mono">
-                          {new Date(reading.date).toLocaleDateString()}{' '}
-                          <span className="text-gray-300">|</span>{' '}
-                          {new Date(reading.date).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : (
-          <div className="py-12 flex flex-col items-center justify-center text-gray-500">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-              <ClipboardList className="w-8 h-8 text-gray-400" />
-            </div>
-            <p>No readings recorded yet for this patient.</p>
-          </div>
-        )}
-      </Card>
+      {/* Recent Readings List was moved into the main grid above */}
 
       {/* Messaging & Conversations */}
       <div className="space-y-6">

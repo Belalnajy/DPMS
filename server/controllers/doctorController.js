@@ -53,7 +53,7 @@ const getPatientDetails = (req, res) => {
   const data = {};
 
   db.query(
-    'SELECT id, role, name, national_id, phone, gender, profile_picture, diabetes_type FROM users WHERE id = $1',
+    'SELECT id, role, name, national_id, phone, gender, profile_picture, diabetes_type, settings FROM users WHERE id = $1',
     [patientId],
     (err, result) => {
       if (err || !result.rows || result.rows.length === 0)
@@ -226,6 +226,21 @@ const getAllMessages = (req, res) => {
   );
 };
 
+// Update Patient Settings (Doctor side)
+const updatePatientSettings = (req, res) => {
+  const patientId = req.params.id;
+  const { settings } = req.body;
+
+  db.query(
+    'UPDATE users SET settings = $1 WHERE id = $2',
+    [settings, patientId],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ message: 'Settings updated' });
+    },
+  );
+};
+
 module.exports = {
   getAllPatients,
   getPatientDetails,
@@ -233,4 +248,5 @@ module.exports = {
   sendMessage,
   getAllMessages,
   markMessagesRead,
+  updatePatientSettings,
 };

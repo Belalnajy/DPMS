@@ -197,23 +197,32 @@ const DoctorMessages = () => {
   }
 
   return (
-    <DashboardLayout unreadCount={unreadCount}>
-      <div className="flex flex-col h-[calc(100vh-120px)] lg:h-[calc(100vh-160px)] overflow-hidden">
-        {/* Header - Fixed Height */}
-        <div className="mb-4 shrink-0 px-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
-              <p className="text-gray-500 text-sm">
-                Patient communications and alerts
-              </p>
+    <DashboardLayout unreadCount={unreadCount} maxWidth="max-w-[1600px]">
+      <div className="flex flex-col h-[calc(100vh-80px)] lg:h-[calc(100vh-100px)] overflow-hidden">
+        {/* Header - Ultra Compact */}
+        <div className="mb-2 lg:mb-3 shrink-0 px-2">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <h1 className="text-xl lg:text-2xl font-bold text-gray-900 leading-none">
+                Messages
+              </h1>
+              <div className="hidden sm:flex gap-2">
+                <Badge
+                  variant="default"
+                  className="bg-white border text-[0.65rem] py-0.5">
+                  {patients.length} Patients
+                </Badge>
+                <Badge variant="danger" className="text-[0.65rem] py-0.5">
+                  {urgentCount} Urgent
+                </Badge>
+              </div>
             </div>
-            <div className="flex gap-4">
-              <Badge variant="default" className="bg-white border text-xs">
-                {patients.length} Patients
-              </Badge>
-              <Badge variant="danger" className="text-xs">
-                {urgentCount} Urgent
+            <p className="hidden xl:block text-gray-500 text-xs">
+              Patient communications and alerts
+            </p>
+            <div className="flex sm:hidden gap-2">
+              <Badge variant="danger" className="text-[0.6rem] px-1.5">
+                {urgentCount}
               </Badge>
             </div>
           </div>
@@ -222,7 +231,7 @@ const DoctorMessages = () => {
         {/* Main Messaging Interface */}
         <div className="flex-1 min-h-0 grid grid-cols-12 gap-6 px-2 pb-2">
           {/* Patient List Sidebar */}
-          <div className="hidden lg:flex lg:col-span-4 h-full flex-col min-h-0">
+          <div className="hidden lg:flex lg:col-span-3 h-full flex-col min-h-0">
             <Card className="flex-1 flex flex-col p-0 overflow-hidden shadow-sm border-gray-100 min-h-0 bg-white">
               <div className="p-4 border-b border-gray-100 shrink-0">
                 <div className="relative">
@@ -300,27 +309,29 @@ const DoctorMessages = () => {
           </div>
 
           {/* Conversation Thread */}
-          <div className="col-span-12 lg:col-span-8 h-full flex flex-col min-h-0">
+          <div className="col-span-12 lg:col-span-9 h-full flex flex-col min-h-0">
             <Card className="flex-1 flex flex-col p-0 overflow-hidden shadow-lg border-gray-100 min-h-0 bg-white">
               {selectedPatient ? (
                 <>
                   {/* Conversation Header */}
-                  <div className="px-6 py-3 border-b border-gray-100 bg-white flex items-center gap-3 shrink-0">
-                    <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 shadow-sm">
-                      <User className="w-5 h-5" />
+                  <div className="px-4 py-2 lg:px-6 lg:py-3 border-b border-gray-100 bg-white flex items-center gap-3 shrink-0">
+                    <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 shadow-sm">
+                      <User className="w-4 h-4 lg:w-5 lg:h-5" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-gray-900 text-sm">
+                      <h3 className="font-bold text-gray-900 text-xs lg:text-sm">
                         {selectedPatient.name}
                       </h3>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[0.65rem] text-gray-500 font-medium">
+                        <span className="text-[0.6rem] text-gray-500 font-medium">
                           ID: {selectedPatient.nationalId || selectedPatient.id}
                         </span>
                       </div>
                     </div>
                     <div className="ml-auto">
-                      <Badge variant="default" className="text-xs">
+                      <Badge
+                        variant="default"
+                        className="text-[0.6rem] lg:text-xs">
                         {selectedPatient.messages.length} messages
                       </Badge>
                     </div>
@@ -346,7 +357,7 @@ const DoctorMessages = () => {
                             key={msg.id}
                             className={`flex ${isFromDoctor ? 'justify-end' : 'justify-start'}`}>
                             <div
-                              className={`max-w-[85%] rounded-2xl px-4 py-2.5 shadow-sm ${
+                              className={`max-w-[75%] lg:max-w-[80%] rounded-2xl px-5 py-3 shadow-sm ${
                                 msg.type === 'recommendation'
                                   ? 'bg-amber-100 border border-amber-200 text-amber-900'
                                   : isFromDoctor
@@ -400,23 +411,25 @@ const DoctorMessages = () => {
                   </div>
 
                   {/* Message Input - Fixed at bottom of Card */}
-                  <div className="p-4 border-t border-gray-100 bg-white shrink-0">
-                    <div className="mb-3">
-                      <div className="text-[0.6rem] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">
+                  <div className="p-2 lg:p-4 border-t border-gray-100 bg-white shrink-0">
+                    <div className="mb-2 lg:mb-3">
+                      <div className="hidden sm:block text-[0.6rem] font-bold text-gray-400 uppercase tracking-widest mb-1 lg:mb-2 px-1">
                         Quick Recommendations
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {recommendations.map((rec) => (
-                          <button
-                            key={rec}
-                            type="button"
-                            onClick={() =>
-                              handleSendMessage(null, rec, 'recommendation')
-                            }
-                            className="text-[0.65rem] bg-amber-50 text-amber-700 border border-amber-100 px-2 py-1 rounded-md hover:bg-amber-100 transition-colors font-semibold">
-                            {rec}
-                          </button>
-                        ))}
+                      <div className="flex overflow-x-auto gap-2 pb-1 custom-scrollbar no-scrollbar">
+                        <div className="flex gap-2 flex-nowrap">
+                          {recommendations.map((rec) => (
+                            <button
+                              key={rec}
+                              type="button"
+                              onClick={() =>
+                                handleSendMessage(null, rec, 'recommendation')
+                              }
+                              className="text-[0.65rem] bg-amber-50 text-amber-700 border border-amber-100 px-2 py-1 rounded-md hover:bg-amber-100 transition-colors font-semibold">
+                              {rec}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                     <form onSubmit={handleSendMessage} className="space-y-3">

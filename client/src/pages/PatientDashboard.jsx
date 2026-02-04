@@ -45,8 +45,6 @@ const PatientDashboard = () => {
     api
       .get(`/patients/${user.id}/dashboard`)
       .then((res) => {
-        console.log('PatientDashboard API Response:', res.data);
-        console.log('unreadCount from API:', res.data.unreadCount);
         setData(res.data);
         setLoading(false);
       })
@@ -222,13 +220,6 @@ const PatientDashboard = () => {
         todayReadings[0],
       )
     : null;
-
-  console.log(
-    'PatientDashboard unreadCount:',
-    unreadCount,
-    'from data:',
-    data.unreadCount,
-  );
 
   return (
     <DashboardLayout unreadCount={unreadCount || 0}>

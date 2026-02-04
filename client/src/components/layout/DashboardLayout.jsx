@@ -9,7 +9,11 @@ import { Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
-const DashboardLayout = ({ children, unreadCount = 0 }) => {
+const DashboardLayout = ({
+  children,
+  unreadCount = 0,
+  maxWidth = 'max-w-7xl',
+}) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
@@ -50,7 +54,7 @@ const DashboardLayout = ({ children, unreadCount = 0 }) => {
           </button>
         </div>
 
-        <div className="p-4 lg:p-8 max-w-7xl mx-auto w-full flex-1">
+        <div className={`p-2 sm:p-4 lg:p-8 ${maxWidth} mx-auto w-full flex-1`}>
           {children}
         </div>
       </main>

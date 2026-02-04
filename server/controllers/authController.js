@@ -32,8 +32,11 @@ const login = (req, res) => {
           id: user.id,
           role: user.role,
           name: user.name,
+          phone: user.phone,
+          gender: user.gender,
           profile_picture: user.profile_picture,
           diabetes_type: user.diabetes_type,
+          settings: user.settings,
         },
       });
     },

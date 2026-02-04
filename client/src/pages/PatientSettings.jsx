@@ -16,6 +16,7 @@ const PatientSettings = () => {
   const navigate = useNavigate();
   const [saved, setSaved] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [profile, setProfile] = useState(null);
   const [targets, setTargets] = useState({
     fastingMin: 70,
     fastingMax: 180,
@@ -43,6 +44,9 @@ const PatientSettings = () => {
       .get(`/patients/${user.id}/dashboard`)
       .then((res) => {
         setUnreadCount(res.data.unreadCount || 0);
+        if (res.data.user) {
+          setProfile(res.data.user);
+        }
       })
       .catch((err) => console.error('Failed to load unread count', err));
   }, [user]);
@@ -104,14 +108,14 @@ const PatientSettings = () => {
           <FormInput
             label="Full Name"
             type="text"
-            defaultValue={user?.name || ''}
+            value={profile?.name || user?.name || ''}
             disabled
           />
 
           <FormInput
             label="Phone Number"
             type="tel"
-            defaultValue={user?.phone || ''}
+            value={profile?.phone || user?.phone || ''}
             placeholder="+20 XXX XXX XXXX"
             disabled
           />
@@ -119,7 +123,7 @@ const PatientSettings = () => {
           <div className="mb-6">
             <label className="label">Gender</label>
             <select
-              defaultValue={user?.gender || 'Male'}
+              value={profile?.gender || user?.gender || 'Male'}
               className="input"
               disabled>
               <option value="Male">Male</option>
@@ -140,7 +144,7 @@ const PatientSettings = () => {
               Glucose Targets
             </h3>
             <p className="text-sm text-gray-500 mb-4">
-              Sets your reference range for charts and alerts.
+              Your reference range for charts and alerts.
             </p>
             <div className="space-y-4">
               <div>
@@ -149,25 +153,15 @@ const PatientSettings = () => {
                   <input
                     type="number"
                     value={targets.fastingMin}
-                    onChange={(e) =>
-                      setTargets({
-                        ...targets,
-                        fastingMin: parseInt(e.target.value),
-                      })
-                    }
-                    className="input w-24 text-center"
+                    className="input w-24 text-center bg-gray-50 color-gray-500 cursor-not-allowed"
+                    readOnly
                   />
                   <span className="text-gray-400">—</span>
                   <input
                     type="number"
                     value={targets.fastingMax}
-                    onChange={(e) =>
-                      setTargets({
-                        ...targets,
-                        fastingMax: parseInt(e.target.value),
-                      })
-                    }
-                    className="input w-24 text-center"
+                    className="input w-24 text-center bg-gray-50 color-gray-500 cursor-not-allowed"
+                    readOnly
                   />
                   <span className="text-sm text-gray-500">mg/dL</span>
                 </div>
@@ -178,34 +172,23 @@ const PatientSettings = () => {
                   <input
                     type="number"
                     value={targets.postMealMin}
-                    onChange={(e) =>
-                      setTargets({
-                        ...targets,
-                        postMealMin: parseInt(e.target.value),
-                      })
-                    }
-                    className="input w-24 text-center"
+                    className="input w-24 text-center bg-gray-50 color-gray-500 cursor-not-allowed"
+                    readOnly
                   />
                   <span className="text-gray-400">—</span>
                   <input
                     type="number"
                     value={targets.postMealMax}
-                    onChange={(e) =>
-                      setTargets({
-                        ...targets,
-                        postMealMax: parseInt(e.target.value),
-                      })
-                    }
-                    className="input w-24 text-center"
+                    className="input w-24 text-center bg-gray-50 color-gray-500 cursor-not-allowed"
+                    readOnly
                   />
                   <span className="text-sm text-gray-500">mg/dL</span>
                 </div>
               </div>
             </div>
-            <div className="mt-6">
-              <Button onClick={handleSave} fullWidth>
-                Save Targets
-              </Button>
+            <div className="mt-8 pt-4 border-t border-gray-100 italic text-xs text-center text-gray-400">
+              Glucose targets are managed and updated by your healthcare
+              provider to ensure your safety.
             </div>
           </Card>
         </div>

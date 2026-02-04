@@ -137,7 +137,7 @@ const initDb = async () => {
                 date TEXT NOT NULL
             )`);
 
-      console.log('PostgreSQL Tables verified/created.');
+      // console.log('PostgreSQL Tables verified/created.');
 
       // Auto-Migration for existing databases
       try {
@@ -153,7 +153,6 @@ const initDb = async () => {
         await pool.query(
           'ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_id INTEGER',
         );
-        console.log('Schema migration applied (columns added if missing).');
       } catch (migrationErr) {
         console.error(
           'Migration warning (ignorable if columns exist):',
@@ -234,7 +233,7 @@ const initDb = async () => {
             FOREIGN KEY(patient_id) REFERENCES users(id)
         )`);
 
-      console.log('SQLite Tables verified/created.');
+      // console.log('SQLite Tables verified/created.');
 
       // SQLite Migrations
       try {
@@ -247,7 +246,6 @@ const initDb = async () => {
         await runAsync(
           'ALTER TABLE messages ADD COLUMN sender_id INTEGER',
         ).catch(() => {});
-        console.log('SQLite Schema migration applied.');
       } catch (migErr) {
         console.log('SQLite Migration warning:', migErr.message);
       }

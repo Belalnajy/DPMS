@@ -26,9 +26,6 @@ const Sidebar = ({ isOpen, onClose, unreadCount = 0 }) => {
 
   const isActive = (path) => location.pathname === path;
 
-  // Debug logging
-  console.log('Sidebar unreadCount:', unreadCount, 'type:', typeof unreadCount);
-
   // Doctor navigation links
   const doctorLinks = [
     { path: '/doctor/dashboard', label: 'Patients List', icon: Users },
